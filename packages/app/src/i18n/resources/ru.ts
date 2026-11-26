@@ -2753,6 +2753,7 @@ export const ru: TranslationResources = {
           midnight: "Полночь",
           claude: "Claude",
           ghostty: "Ghostty",
+          openchamber: "OpenChamber",
           pureBlack: "Абсолютно чёрная",
           auto: "Системная",
         },

@@ -2739,6 +2739,7 @@ export const ar: TranslationResources = {
           midnight: "منتصف الليل",
           claude: "كلود",
           ghostty: "شبحي",
+          openchamber: "OpenChamber",
           pureBlack: "أسود خالص",
           auto: "نظام",
         },

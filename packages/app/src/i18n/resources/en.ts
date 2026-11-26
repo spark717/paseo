@@ -2836,6 +2836,7 @@ export const en = {
           midnight: "Midnight",
           claude: "Claude",
           ghostty: "Ghostty",
+          openchamber: "OpenChamber",
           pureBlack: "Pure black",
           auto: "System",
         },

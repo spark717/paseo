@@ -531,6 +531,27 @@ const claudeDarkColors = buildDarkSemanticColors({
   terminalBrightBlack: "#4a4745",
 });
 
+// OpenChamber — warm near-black with an ink-orange accent, after the OpenChamber web UI
+// (Flexoki-derived palette: paper-warm grays, orange 400/600, red 400).
+const openChamberDarkColors = buildDarkSemanticColors({
+  surface0: "#100F0F",
+  surface1: "#151413",
+  surface2: "#201F1D",
+  surface3: "#343331",
+  surface4: "#403E3C",
+  surfaceSidebar: "#0D0C0C",
+  foreground: "#DAD8CE",
+  foregroundMuted: "#A8A59E",
+  foregroundExtraMuted: "#6F6E69",
+  border: "#282726",
+  borderAccent: "#343331",
+  accent: "#BC5215",
+  accentBright: "#DA702C",
+  destructive: "#D14D41", // Flexoki red 400 — warm, sits with the orange accent
+  terminalBlack: "#100F0F",
+  terminalBrightBlack: "#575653",
+});
+
 // Ghostty — blue-tinted dark based on Ghostty default background
 const ghosttyDarkColors = buildDarkSemanticColors({
   surface0: "#282c34",
@@ -722,6 +743,7 @@ export const darkZincTheme = buildDarkTheme(zincDarkColors);
 export const darkMidnightTheme = buildDarkTheme(midnightDarkColors);
 export const darkClaudeTheme = buildDarkTheme(claudeDarkColors);
 export const darkGhosttyTheme = buildDarkTheme(ghosttyDarkColors);
+export const darkOpenChamberTheme = buildDarkTheme(openChamberDarkColors);
 
 // Pure black — zero-luminance background with high-contrast surfaces. A control over the
 // workspace surface (`surface2` on `surface1`) steps by a contrast ratio of 1.12, the step Paseo
@@ -828,6 +850,13 @@ export const THEME_OPTIONS = [
     unistylesName: "darkGhostty",
     theme: darkGhosttyTheme,
     swatch: "#8caaee",
+  },
+  {
+    name: "openchamber",
+    group: "variant",
+    unistylesName: "darkOpenChamber",
+    theme: darkOpenChamberTheme,
+    swatch: "#DA702C",
   },
   {
     name: "pureBlack",

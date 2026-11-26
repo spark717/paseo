@@ -2747,6 +2747,7 @@ export const ptBR: TranslationResources = {
           midnight: "Midnight",
           claude: "Claude",
           ghostty: "Ghostty",
+          openchamber: "OpenChamber",
           pureBlack: "Preto puro",
           auto: "Sistema",
         },

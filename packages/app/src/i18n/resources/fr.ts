@@ -2765,6 +2765,7 @@ export const fr: TranslationResources = {
           midnight: "Minuit",
           claude: "Claude",
           ghostty: "Ghostty",
+          openchamber: "OpenChamber",
           pureBlack: "Noir pur",
           auto: "Système",
         },

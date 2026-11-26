@@ -2676,6 +2676,7 @@ export const zhCN: TranslationResources = {
           midnight: "Midnight",
           claude: "Claude",
           ghostty: "Ghostty",
+          openchamber: "OpenChamber",
           pureBlack: "纯黑",
           auto: "系统",
         },

@@ -34,6 +34,7 @@ describe("Theme catalog", () => {
       "midnight",
       "claude",
       "ghostty",
+      "openchamber",
       "pureBlack",
     ]);
     expect(getNextThemePreference("dark")).toBe("auto");
