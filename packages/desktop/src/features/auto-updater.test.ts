@@ -78,6 +78,7 @@ vi.mock("electron-updater", () => ({
 }));
 
 import {
+  APP_UPDATES_ENABLED,
   checkForAppUpdate,
   createAppUpdateLifecycleLogger,
   downloadAndInstallUpdate,
@@ -86,39 +87,69 @@ import {
   shouldInstallAppUpdateOnQuit,
 } from "./auto-updater";
 
-describe("checkForAppUpdate", () => {
-  it("treats an unpublished channel manifest as an unavailable update", async () => {
-    const error = Object.assign(new Error("Cannot find latest-mac.yml"), {
-      code: "ERR_UPDATER_CHANNEL_FILE_NOT_FOUND",
-    });
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    autoUpdaterMock.checkForUpdates.mockImplementationOnce(async () => {
-      autoUpdaterMock.logger.error(error);
-      autoUpdaterMock.handlers.get("error")?.(error);
-      throw error;
-    });
+// The update flow only runs when this build updates itself; fork builds turn it off.
+const itWhenUpdatesEnabled = it.skipIf(!APP_UPDATES_ENABLED);
 
-    const result = await checkForAppUpdate({
+describe.skipIf(APP_UPDATES_ENABLED)("with app updates disabled", () => {
+  it("never asks the release feed, even for a packaged manual check or install", async () => {
+    autoUpdaterMock.checkForUpdates.mockClear();
+    autoUpdaterMock.downloadUpdate.mockClear();
+    autoUpdaterMock.quitAndInstall.mockClear();
+
+    const check = await checkForAppUpdate({
       currentVersion: "1.2.3",
       releaseChannel: "stable",
       intent: "manual",
     });
-
-    expect(result).toEqual({
-      hasUpdate: false,
-      readyToInstall: false,
-      downloading: false,
+    const install = await downloadAndInstallUpdate({
       currentVersion: "1.2.3",
-      latestVersion: "1.2.3",
-      body: null,
-      date: null,
-      errorMessage: null,
+      releaseChannel: "stable",
     });
-    expect(consoleError).not.toHaveBeenCalled();
-    consoleError.mockRestore();
-  });
 
-  it("keeps genuine updater failures visible", async () => {
+    expect(check).toMatchObject({ hasUpdate: false, latestVersion: "1.2.3", errorMessage: null });
+    expect(install).toMatchObject({ installed: false, version: "1.2.3" });
+    expect(autoUpdaterMock.checkForUpdates).not.toHaveBeenCalled();
+    expect(autoUpdaterMock.downloadUpdate).not.toHaveBeenCalled();
+    expect(autoUpdaterMock.quitAndInstall).not.toHaveBeenCalled();
+  });
+});
+
+describe("checkForAppUpdate", () => {
+  itWhenUpdatesEnabled(
+    "treats an unpublished channel manifest as an unavailable update",
+    async () => {
+      const error = Object.assign(new Error("Cannot find latest-mac.yml"), {
+        code: "ERR_UPDATER_CHANNEL_FILE_NOT_FOUND",
+      });
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      autoUpdaterMock.checkForUpdates.mockImplementationOnce(async () => {
+        autoUpdaterMock.logger.error(error);
+        autoUpdaterMock.handlers.get("error")?.(error);
+        throw error;
+      });
+
+      const result = await checkForAppUpdate({
+        currentVersion: "1.2.3",
+        releaseChannel: "stable",
+        intent: "manual",
+      });
+
+      expect(result).toEqual({
+        hasUpdate: false,
+        readyToInstall: false,
+        downloading: false,
+        currentVersion: "1.2.3",
+        latestVersion: "1.2.3",
+        body: null,
+        date: null,
+        errorMessage: null,
+      });
+      expect(consoleError).not.toHaveBeenCalled();
+      consoleError.mockRestore();
+    },
+  );
+
+  itWhenUpdatesEnabled("keeps genuine updater failures visible", async () => {
     const error = new Error("network down");
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
     autoUpdaterMock.checkForUpdates.mockImplementationOnce(async () => {
@@ -138,121 +169,130 @@ describe("checkForAppUpdate", () => {
     consoleError.mockRestore();
   });
 
-  it("configures electron-updater autoDownload from checkForAppUpdate options", async () => {
-    autoUpdaterMock.checkForUpdates.mockResolvedValueOnce({
-      isUpdateAvailable: true,
-      updateInfo: { version: "1.2.5" },
-    });
+  itWhenUpdatesEnabled(
+    "configures electron-updater autoDownload from checkForAppUpdate options",
+    async () => {
+      autoUpdaterMock.checkForUpdates.mockResolvedValueOnce({
+        isUpdateAvailable: true,
+        updateInfo: { version: "1.2.5" },
+      });
 
-    const result = await checkForAppUpdate({
-      currentVersion: "1.2.3",
-      releaseChannel: "stable",
-      intent: "automatic",
-      autoDownload: false,
-    });
-
-    expect((autoUpdaterMock as unknown as { autoDownload?: boolean }).autoDownload).toBe(false);
-    expect(result).toMatchObject({
-      hasUpdate: true,
-      readyToInstall: false,
-      downloading: false,
-      latestVersion: "1.2.5",
-    });
-  });
-
-  it("forwards download-progress to window progress bars and renderer events", async () => {
-    const setProgressBar = vi.fn();
-    const send = vi.fn();
-    getAllWindowsMock.mockReturnValue([
-      { isDestroyed: () => false, setProgressBar, webContents: { send } },
-    ]);
-    autoUpdaterMock.checkForUpdates.mockResolvedValueOnce({
-      isUpdateAvailable: true,
-      updateInfo: { version: "1.2.6" },
-    });
-
-    await checkForAppUpdate({
-      currentVersion: "1.2.3",
-      releaseChannel: "stable",
-      intent: "automatic",
-      autoDownload: true,
-    });
-    autoUpdaterMock.handlers.get("download-progress")?.({
-      percent: 42,
-      transferred: 420,
-      total: 1000,
-      bytesPerSecond: 100,
-    });
-
-    expect(setProgressBar).toHaveBeenCalledWith(0.42);
-    expect(send).toHaveBeenCalledWith("paseo:event:app-update-download-progress", {
-      version: "1.2.6",
-      percent: 42,
-      transferred: 420,
-      total: 1000,
-      bytesPerSecond: 100,
-    });
-
-    autoUpdaterMock.handlers.get("update-downloaded")?.({ version: "1.2.6" });
-    expect(setProgressBar).toHaveBeenLastCalledWith(-1);
-    expect(send).toHaveBeenLastCalledWith("paseo:event:app-update-download-progress", null);
-    getAllWindowsMock.mockReturnValue([]);
-  });
-
-  it("gates automatic checks and autoDownload from desktop settings and falls back to automatic on read failure", async () => {
-    const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
-    try {
-      autoUpdaterMock.checkForUpdates.mockClear();
-      desktopSettingsMock.mode = "off";
-      const offAuto = await checkForAppUpdate({
+      const result = await checkForAppUpdate({
         currentVersion: "1.2.3",
         releaseChannel: "stable",
         intent: "automatic",
+        autoDownload: false,
       });
-      expect(offAuto.hasUpdate).toBe(false);
-      expect(autoUpdaterMock.checkForUpdates).not.toHaveBeenCalled();
 
-      autoUpdaterMock.checkForUpdates.mockResolvedValueOnce({
-        isUpdateAvailable: true,
-        updateInfo: { version: "1.2.9" },
-      });
-      const offManual = await checkForAppUpdate({
-        currentVersion: "1.2.3",
-        releaseChannel: "stable",
-        intent: "manual",
-      });
-      expect(offManual).toMatchObject({
+      expect((autoUpdaterMock as unknown as { autoDownload?: boolean }).autoDownload).toBe(false);
+      expect(result).toMatchObject({
         hasUpdate: true,
+        readyToInstall: false,
         downloading: false,
-        latestVersion: "1.2.9",
+        latestVersion: "1.2.5",
       });
+    },
+  );
 
-      desktopSettingsMock.mode = "automatic";
-      desktopSettingsMock.error = new SyntaxError("Unexpected token } in JSON");
+  itWhenUpdatesEnabled(
+    "forwards download-progress to window progress bars and renderer events",
+    async () => {
+      const setProgressBar = vi.fn();
+      const send = vi.fn();
+      getAllWindowsMock.mockReturnValue([
+        { isDestroyed: () => false, setProgressBar, webContents: { send } },
+      ]);
       autoUpdaterMock.checkForUpdates.mockResolvedValueOnce({
         isUpdateAvailable: true,
-        updateInfo: { version: "1.2.10" },
+        updateInfo: { version: "1.2.6" },
       });
-      const fallbackResult = await checkForAppUpdate({
+
+      await checkForAppUpdate({
         currentVersion: "1.2.3",
         releaseChannel: "stable",
         intent: "automatic",
+        autoDownload: true,
       });
-      expect(fallbackResult).toMatchObject({
-        hasUpdate: true,
-        downloading: true,
-        latestVersion: "1.2.10",
+      autoUpdaterMock.handlers.get("download-progress")?.({
+        percent: 42,
+        transferred: 420,
+        total: 1000,
+        bytesPerSecond: 100,
       });
-      expect(consoleWarn).toHaveBeenCalled();
-      autoUpdaterMock.handlers.get("update-downloaded")?.({ version: "1.2.10" });
-    } finally {
-      desktopSettingsMock.mode = "automatic";
-      desktopSettingsMock.error = null;
-      consoleWarn.mockRestore();
-    }
-  });
 
-  it("does not fail update events when setProgressBar throws", async () => {
+      expect(setProgressBar).toHaveBeenCalledWith(0.42);
+      expect(send).toHaveBeenCalledWith("paseo:event:app-update-download-progress", {
+        version: "1.2.6",
+        percent: 42,
+        transferred: 420,
+        total: 1000,
+        bytesPerSecond: 100,
+      });
+
+      autoUpdaterMock.handlers.get("update-downloaded")?.({ version: "1.2.6" });
+      expect(setProgressBar).toHaveBeenLastCalledWith(-1);
+      expect(send).toHaveBeenLastCalledWith("paseo:event:app-update-download-progress", null);
+      getAllWindowsMock.mockReturnValue([]);
+    },
+  );
+
+  itWhenUpdatesEnabled(
+    "gates automatic checks and autoDownload from desktop settings and falls back to automatic on read failure",
+    async () => {
+      const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+      try {
+        autoUpdaterMock.checkForUpdates.mockClear();
+        desktopSettingsMock.mode = "off";
+        const offAuto = await checkForAppUpdate({
+          currentVersion: "1.2.3",
+          releaseChannel: "stable",
+          intent: "automatic",
+        });
+        expect(offAuto.hasUpdate).toBe(false);
+        expect(autoUpdaterMock.checkForUpdates).not.toHaveBeenCalled();
+
+        autoUpdaterMock.checkForUpdates.mockResolvedValueOnce({
+          isUpdateAvailable: true,
+          updateInfo: { version: "1.2.9" },
+        });
+        const offManual = await checkForAppUpdate({
+          currentVersion: "1.2.3",
+          releaseChannel: "stable",
+          intent: "manual",
+        });
+        expect(offManual).toMatchObject({
+          hasUpdate: true,
+          downloading: false,
+          latestVersion: "1.2.9",
+        });
+
+        desktopSettingsMock.mode = "automatic";
+        desktopSettingsMock.error = new SyntaxError("Unexpected token } in JSON");
+        autoUpdaterMock.checkForUpdates.mockResolvedValueOnce({
+          isUpdateAvailable: true,
+          updateInfo: { version: "1.2.10" },
+        });
+        const fallbackResult = await checkForAppUpdate({
+          currentVersion: "1.2.3",
+          releaseChannel: "stable",
+          intent: "automatic",
+        });
+        expect(fallbackResult).toMatchObject({
+          hasUpdate: true,
+          downloading: true,
+          latestVersion: "1.2.10",
+        });
+        expect(consoleWarn).toHaveBeenCalled();
+        autoUpdaterMock.handlers.get("update-downloaded")?.({ version: "1.2.10" });
+      } finally {
+        desktopSettingsMock.mode = "automatic";
+        desktopSettingsMock.error = null;
+        consoleWarn.mockRestore();
+      }
+    },
+  );
+
+  itWhenUpdatesEnabled("does not fail update events when setProgressBar throws", async () => {
     const send = vi.fn();
     getAllWindowsMock.mockReturnValue([
       {
@@ -289,28 +329,31 @@ describe("checkForAppUpdate", () => {
     getAllWindowsMock.mockReturnValue([]);
   });
 
-  it("reports a failure when quitAndInstall emits an installer error and returns normally", async () => {
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    autoUpdaterMock.checkForUpdates.mockResolvedValueOnce({
-      isUpdateAvailable: true,
-      updateInfo: { version: "1.2.8" },
-    });
-    autoUpdaterMock.downloadUpdate.mockResolvedValueOnce(undefined);
-    autoUpdaterMock.quitAndInstall.mockImplementationOnce(() => {
-      autoUpdaterMock.handlers.get("error")?.(new Error("EROFS: read-only file system"));
-    });
+  itWhenUpdatesEnabled(
+    "reports a failure when quitAndInstall emits an installer error and returns normally",
+    async () => {
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      autoUpdaterMock.checkForUpdates.mockResolvedValueOnce({
+        isUpdateAvailable: true,
+        updateInfo: { version: "1.2.8" },
+      });
+      autoUpdaterMock.downloadUpdate.mockResolvedValueOnce(undefined);
+      autoUpdaterMock.quitAndInstall.mockImplementationOnce(() => {
+        autoUpdaterMock.handlers.get("error")?.(new Error("EROFS: read-only file system"));
+      });
 
-    const result = await downloadAndInstallUpdate({
-      currentVersion: "1.2.3",
-      releaseChannel: "stable",
-    });
+      const result = await downloadAndInstallUpdate({
+        currentVersion: "1.2.3",
+        releaseChannel: "stable",
+      });
 
-    expect(result).toMatchObject({
-      installed: false,
-      errorMessage: "EROFS: read-only file system",
-    });
-    consoleError.mockRestore();
-  });
+      expect(result).toMatchObject({
+        installed: false,
+        errorMessage: "EROFS: read-only file system",
+      });
+      consoleError.mockRestore();
+    },
+  );
 
   it("waits on macOS explicit installs until Squirrel reports an error or signals quit, while returning immediately on quit-time handoff", async () => {
     const updater = Object.assign(new EventEmitter(), {

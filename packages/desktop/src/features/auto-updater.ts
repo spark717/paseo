@@ -372,9 +372,14 @@ const appUpdatePacing = createAppUpdatePacing({
   },
 });
 
+// Fork builds must not update themselves: the release feed is upstream Paseo's, and
+// installing one of its releases would replace this fork's build. With this off, the
+// update service treats every check, download and install-on-quit as unavailable.
+export const APP_UPDATES_ENABLED = false;
+
 const appUpdateService = createAppUpdateService({
   runtime: new ElectronAppUpdateRuntime(),
-  isPackaged: () => app.isPackaged,
+  isPackaged: () => APP_UPDATES_ENABLED && app.isPackaged,
   now: () => Date.now(),
   bucket: async (version) => rolloutBucket(await getStagingUserId(), version),
   pacing: appUpdatePacing,
@@ -409,7 +414,7 @@ const appUpdateService = createAppUpdateService({
  * update cooldown. Call once when the app is ready. Never rejects.
  */
 export function startAppUpdatePacing(): Promise<void> {
-  if (!app.isPackaged) return Promise.resolve();
+  if (!APP_UPDATES_ENABLED || !app.isPackaged) return Promise.resolve();
   return appUpdatePacing.start();
 }
 
