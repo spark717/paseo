@@ -54,7 +54,12 @@ export function MessagePreview({ itemId, children }: { itemId: string; children:
           {children}
         </View>
         {overflowing && !expanded ? (
-          <EdgeFade edge="bottom" solidFraction={0} backdrop="surface3" style={styles.fade} />
+          <EdgeFade
+            edge="bottom"
+            solidFraction={0}
+            backdrop="surfaceUserMessage"
+            style={styles.fade}
+          />
         ) : null}
       </View>
       {overflowing ? (

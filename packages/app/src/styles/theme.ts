@@ -271,6 +271,7 @@ export function buildLightSemanticColors(tint: LightThemeConfig) {
     surface2: tint.surface2,
     surface3: tint.surface3,
     surface4: tint.surface4,
+    surfaceUserMessage: tint.surface3,
     surfaceSidebar: tint.surfaceSidebar,
     surfaceSidebarHover: tint.surfaceSidebarHover ?? sidebarStates.hover,
     surfaceSidebarSelected: tint.surfaceSidebarSelected ?? sidebarStates.selected,
@@ -370,6 +371,8 @@ export interface DarkThemeConfig {
   terminalBrightBlack: string;
   foreground?: string;
   ring?: string;
+  /** Fill of the user's own chat message bubble. Defaults to surface3. */
+  surfaceUserMessage?: string;
 }
 
 const darkTerminalAnsi = {
@@ -399,6 +402,7 @@ export function buildDarkSemanticColors(tint: DarkThemeConfig) {
     surface2: tint.surface2,
     surface3: tint.surface3,
     surface4: tint.surface4,
+    surfaceUserMessage: tint.surfaceUserMessage ?? tint.surface3,
     surfaceSidebar: tint.surfaceSidebar,
     surfaceSidebarHover: tint.surfaceSidebarHover ?? sidebarStates.hover,
     surfaceSidebarSelected: tint.surfaceSidebarSelected ?? sidebarStates.selected,
@@ -548,6 +552,7 @@ const openChamberDarkColors = buildDarkSemanticColors({
   accent: "#BC5215",
   accentBright: "#DA702C",
   destructive: "#D14D41", // Flexoki red 400 — warm, sits with the orange accent
+  surfaceUserMessage: "#2D1F16", // dark ink-brown bubble for the user's own messages
   terminalBlack: "#100F0F",
   terminalBrightBlack: "#575653",
 });

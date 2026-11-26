@@ -42,6 +42,16 @@ describe("Theme catalog", () => {
   });
 });
 
+describe("User message bubble", () => {
+  it("uses the OpenChamber ink-brown fill and surface3 everywhere else", () => {
+    for (const option of THEME_OPTIONS) {
+      if (!("theme" in option)) continue;
+      const expected = option.name === "openchamber" ? "#2D1F16" : option.theme.colors.surface3;
+      expect(option.theme.colors.surfaceUserMessage).toBe(expected);
+    }
+  });
+});
+
 describe("Pure black theme", () => {
   it("uses a pure black application and terminal background", () => {
     expect(darkPureBlackTheme.colors.surface0).toBe("#000000");
